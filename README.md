@@ -1,5 +1,3 @@
-# nbases-with-c
-
 ## 'nbases - number bases conversions'
 
 'nbases' is a library that provides basics number bases 
