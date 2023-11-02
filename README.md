@@ -7,15 +7,10 @@ in C. This library consists of two part. First is some
 methods which checks, prepares and converts given values. 
 These are:
 
-+ remove_char()
-+ is_proper()
-+ get_pow()
-+ str_to_num()
-+ clamper()
-+ num_to_char()
-+ hex_chars()
-+ num_to_str()
-+ hex_to_num()
++ _cut_needless_digits_()
++ _num_to_char_()
++ _hex_chars_()
++ _hex_to_num_()
 
 Second is the main methods provides the basics number
 base conversions including:
