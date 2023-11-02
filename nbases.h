@@ -1,623 +1,458 @@
-#include <stdio.h>
-#include <string.h>
-#include <math.h>
-#include <stdbool.h>
+/* NBases - Number Base Conversions
 
-/* 'nbases - number bases conversions'
+Including methods:
+------------------
 
-'nbases' is a library that provides basics number bases 
-conversions. I've written this library, previosuly, in 
-python. And then, I aslo decided to write this library 
-in C. This library consists of two part. First is some 
-methods which checks, prepares and converts given values. 
-These are:
-
-+ remove_char()
-+ is_proper()
-+ get_pow()
-+ str_to_num()
-+ clamper()
-+ num_to_char()
-+ hex_chars()
-+ num_to_str()
-+ hex_to_num()
-
-Second is the main methods provides the basics number
-base conversions including:
-
-+ dec_to_bin()      (decimal to binary)
-+ dec_to_oct()      (decimal to octal)
-+ dec_to_hex()      (decimal to hexadecimal)
-+ bin_to_dec()      (binary to decimal)
-+ bin_to_oct()      (binary to octal)
-+ bin_to_hex()      (binary to hexadecimal)
-+ oct_to_dec()      (octal to decimal)
-+ oct_to_bin()      (octal to binary)
-+ oct_to_hex()      (octal to hexadecimal)
-+ hex_to_dec()      (hexadecimal to decimal)
-+ hex_to_bin()      (hexadecimal to binary)
-+ hex_to_oct()      (hexadecimal to octal)
-
-Also, you can inspect the same library written in Python.
+dec_to_bin()      (decimal to binary)
+dec_to_oct()      (decimal to octal)
+dec_to_hex()      (decimal to hexadecimal)
+bin_to_dec()      (binary to decimal)
+bin_to_oct()      (binary to octal)
+bin_to_hex()      (binary to hexadecimal)
+oct_to_dec()      (octal to decimal)
+oct_to_bin()      (octal to binary)
+oct_to_hex()      (octal to hexadecimal)
+hex_to_dec()      (hexadecimal to decimal)
+hex_to_bin()      (hexadecimal to binary)
+hex_to_oct()      (hexadecimal to octal)
 */
 
-// the biggest values
-#define MAX_LEN 128
-#define MAX_POW_BIN 25   // pow(2, 25)
-#define MAX_POW_OCT 25   // pow(8, 25)
-#define MAX_POW_DEC 15   // pow(10, 15)
-#define MAX_POW_HEX 12   // pow(16, 12)
+// Libraries:
+#include <stdlib.h>
+#include <assert.h>
+#include <ctype.h>
+#include <string.h>
+#include <math.h>
 
-// number bases characters for four number base system.
-char BINARY[]  = {'0', '1', '.'};
-char OCTAL[]   = {'0', '1', '2', '3', 
-                  '4', '5', '6', '7', '.'};
-char DECIMAL[] = {'0', '1', '2', '3', '4', '5', 
-                  '6', '7', '8', '9', '.'};
-char HEX[]     = {'0', '1', '2', '3', '4', 
-                  '5', '6', '7', '8', '9',
-                  'A', 'B', 'C', 'D', 'E', 'F', 
-                  'a', 'b', 'c', 'd','e', 'f', '.'};
+// Macros:
+#ifndef NBASES_H
+   #define NBASES_H  1
+#endif
 
-// Helper Methods:
-// ---------------
+#define True  1
+#define False 0
 
-void remove_char(char* string, char element) {
-   // removes a char from given 'string' value.
-   int i, j;
-   int lenght = strlen(string);
-   // loops all chars in the 'string'.
-   for (i=0; i<lenght; i++) {
-      // finds '.' chars.
-      if (string[i] == element) {
-         for (j=i; j<lenght; j++) string[j] = string[j+1];
-         lenght --; i--;
-      }
-   }
+#define MAX_POW  17
+#define MIN_POW  -18
+#define MAX_LEN  MAX_POW + -MIN_POW + 1
+
+// User-defined data types:
+typedef unsigned short boolean;
+typedef char * string;
+
+/* --------------------------------------------------------------- */
+/* ----------------------- Helper Methods ------------------------ */
+/* --------------------------------------------------------------- */
+
+/* Cut the needless digits from '__number'. */
+string _cut_needless_digits_(string __number) {
+   // Declare the some variables and constants.
+   int first = 0, last = strlen(__number);
+   // Use the heap section of RAM for cuted string.
+   string cstr = malloc(sizeof(char) * strlen(__number));
+   // Find the first and last indexes of '__number'.
+   for (int i=0; i<strlen(__number); i++) 
+      { if (__number[i] != '0') break; first ++; }
+   for (int i=strlen(__number)-1; i >= 0; i--)
+      { if (__number[i] != '0') break; last --; }
+   // Cut the '__number' between fisrt and last.
+   for (int i=first; i<last; i++)
+      cstr[i-first] = __number[i];
+
+   return cstr;
 }
 
-int is_proper(char* value, char nbase) {
-   // returns 1, if given 'value' is in proper number
-   // base system. Otherwise, returns 0.
-   int wrong = 0;
-   int points = 0;
-   bool is_neg = false;
-   // determines given 'value' is negative or not.
-   if (value[0] == '-') { 
-      remove_char(value, value[0]); 
-      is_neg = true;
-   }
-   if (value[0] == '+') remove_char(value, value[0]);
-   // inspects 'points' and its positions.
-   for (int i=0; i<strlen(value); i++) {
-      if (value[i] == '.') points ++;
-   }
-   if (points > 1) return 0;
-   if (value[0] == '.') return 0;
-   if (value[strlen(value)-1] == '.') return 0;
-   // right now, inspects 'nbase' and its conditions.
-   if (nbase == 'd' || nbase == 'D') {
-      for (int i=0; i<strlen(value); i++) {
-         for (int j=0; j<11; j++) {
-            if (value[i] != DECIMAL[j]) wrong ++;
-         }
-      }
-      // checks out the results
-      if (strlen(value) * 11 - strlen(value) == wrong) return 1;
-      else return 0;
-   }
-   else if (nbase == 'b' || nbase == 'B') {
-      for (int i=0; i<strlen(value); i++) {
-         for (int j=0; j<3; j++) {
-            if (value[i] != BINARY[j]) wrong ++;
-         }
-      }
-      // checks out the results
-      if (strlen(value) * 3 - strlen(value) == wrong) return 1;
-      else return 0;
-   }
-   else if (nbase == 'o' || nbase == 'O') {
-      for (int i=0; i<strlen(value); i++) {
-         for (int j=0; j<9; j++) {
-            if (value[i] != OCTAL[j]) wrong ++;
-         }
-      }
-      // checks out the results
-      if (strlen(value) * 9 - strlen(value) == wrong) return 1;
-      else return 0;
-   }
-   else if (nbase == 'h' || nbase == 'H') {
-      for (int i=0; i<strlen(value); i++) {
-         for (int j=0; j<23; j++) {
-            if (value[i] != HEX[j]) wrong ++;
-         }
-      }
-      // checks out the results
-      if (strlen(value) * 23 - strlen(value) == wrong) return 1;
-      else return 0;
-   }
-   else return 0;
-}
-
-float get_pow(int x, int y) {
-   /* Actually, there is a pow  operation in 'math.h' package. 
-   But, I can not use it in linux ubuntu distrubition. So,
-   I defined a simple pow operation. */
-   
-   float result = 1;
-   // these are shorthand result.
-   if (x == 0 && y != 0) return 0;
-   if (y == 0 && x != 0) return 1;
-   // there are four possible situations.
-   if (y > 0) {
-      while (1) {result = result * x; y --; if (y == 0) break;}
-   }
-   else {
-      while (1) {result = result / x; y ++; if (y == 0) break;}
-   }
-
-   return result;
-}
-
-float str_to_num(char* value) {
-   // converts given 'value' from string to float.
-   float decimal = 0;
-   float number;
-   int index = -1;
-   bool is_frac = false;
-   // if there is, finds point index in 'value'.
-   for (int i=0; i<strlen(value); i++) { index ++;
-   if (value[i] == '.') {is_frac = true; break;}}
-   // removes '.' char.
-   remove_char(value, '.');
-   // converts chars to integer.
-   for (int i=0; i<strlen(value); i++) {
-      int limit = strlen(value) - 1 - i;
-      decimal += (value[i] - '0') * get_pow(10, limit);
-   }
-   // considers place of point.
-   if (is_frac == true) {
-      int divison = strlen(value) - index;
-      number = decimal / (float) get_pow(10, divison);
-   } else number = decimal;
-
-   return number;
-}
-
-char* clamper(char* string) {
-   // clamps given 'string' between 'start' and 'finish'.
-   char str[MAX_LEN];
-   int start = -1;
-   int finish = strlen(string);
-   bool is_point = false;
-   // finds start index.
-   for (int i=0; i<strlen(string); i++) {
-      start ++; if (string[i] != '0') break;
-   }
-   // finds point, if given number has fraction. 
-   for (int i=0; i<strlen(string); i++) {
-      if (string[i] == '.') { is_point = true; break; }
-   }
-   if (is_point == true) {
-      // finds end index.
-      for (int i=1; i<strlen(string); i++) {
-      int limit = strlen(string) - i; finish --;
-      if (string[limit] != '0') break;
-      }
-   }
-   // right, now, clamps the given 'string'.
-   for (int i=0; i<strlen(string); i++) {
-      if (i >= start && finish >= i) str[i-start] = string[i];
-   }
-   // returns the clapped 'string'.
-   char* clapped = str; return clapped;
-}
-
-char num_to_char(int number) {
+/* Convert 'number' to characters. */
+char _num_to_char_(int __number) {
    // converts 'number' to char.
-   char converted[MAX_LEN];
-   // uses 'sprintf'.
-   sprintf(converted, "%d", number);
+   char character[32];
+   sprintf(character, "%d", __number);
 
-   return converted[0];
+   return character[0];
 }
 
-char hex_chars(float number, float pow) {
-   // converts hexadecimal chars to 'A', 'B', 'C', 'D', 'E',
-   // 'F' or char numbers in order.
-   int biggest = (int) (number / get_pow(16, pow));
-   // writes consitions.
+/* Convert any decimal number to hexadecimal. */
+char _hex_chars_(double __number, int __pow) {
+   // Find the biggest number in '__number'.
+   int biggest = (int) (__number / pow(16, __pow));
+   // Return the corresponding hexadecimal digits.
    if (biggest == 10) return 'A';
    else if (biggest == 11) return 'B';
    else if (biggest == 12) return 'C';
    else if (biggest == 13) return 'D';
    else if (biggest == 14) return 'E';
    else if (biggest == 15) return 'F';
-   else return num_to_char(biggest);
+   else return _num_to_char_(biggest);
 }
 
-char* num_to_str(float number) {
-   // converts 'number' to char.
-   char converted[MAX_LEN];
-   // uses 'sprintf'.
-   sprintf(converted, "%f", number);
-
-   char* string = converted; return string;
+/* Convert any hexadecimal number to decimal. */
+double _hex_to_num_(char __hex) {
+   // Return the corresponding decimal digits.
+   if (__hex == 'A' || __hex == 'a') return 10;
+   else if (__hex == 'B' || __hex == 'b') return 11;
+   else if (__hex == 'C' || __hex == 'c') return 12;
+   else if (__hex == 'D' || __hex == 'd') return 13;
+   else if (__hex == 'E' || __hex == 'e') return 14;
+   else if (__hex == 'F' || __hex == 'f') return 15;
+   else return (__hex - '0');
 }
 
-float hex_to_num(char element) {
-   // returns hexadecimal chars to number.
-   float number;
-   // writes consitions.
-   if (element == 'A' || element == 'a') return 10.0;
-   else if (element == 'B' || element == 'b') return 11.0;
-   else if (element == 'C' || element == 'c') return 12.0;
-   else if (element == 'D' || element == 'd') return 13.0;
-   else if (element == 'E' || element == 'e') return 14.0;
-   else if (element == 'F' || element == 'f') return 15.0;
-   else return number = (element - '0');
+/* --------------------------------------------------------------- */
+/* ------------------------- Main Methods ------------------------ */
+/* --------------------------------------------------------------- */
+
+/* Convert '__decimal' to binary number. For example: 
+
+string decimal = "54.75";
+string result = dec_to_bin(decimal);
+printf("%s\n", result);
+
+110110.11
+*/
+string dec_to_bin(string __decimal) {
+   // Convert '__decimal' to floating-point number.
+   double decimal = atof(__decimal);
+   // Use the heap section of RAM for creating binary.
+   string binary = malloc(sizeof(char) * MAX_LEN);
+   // Declate the some variables and constants.
+   int index = 0, max_pow = MAX_POW, min_pow = MIN_POW;
+
+   while (True) {
+      // Find the digits corresponding to decimal.
+      if (pow(2, max_pow) > decimal) binary[index] = '0';
+      else binary[index] = '1', decimal -= pow(2, max_pow);
+      // Update the control variables.
+      max_pow --; index ++; 
+      // Break up the while-loop.
+      if (max_pow < 0) break;
+   }
+   // Sometimes, '__decimal' has fractions. For that:
+   if (decimal != 0.0) {
+      // Append the point to 'binary'.
+      binary[index] = '.', index ++;
+
+      while (True) {
+         // Find the digits corresponding to binary.
+         if (pow(2, max_pow) <= decimal)
+            binary[index] = '1', 
+            decimal -= pow(2, max_pow);
+         else 
+            binary[index] = '0';
+         // Update the constrol variables again.
+         index ++, max_pow --;
+         // Break up the while-loop.
+         if (max_pow == min_pow) break;
+   }} 
+   return _cut_needless_digits_(binary);
 }
 
+/* Convert '__decimal' to octal number. For example: 
 
-// Main Methods:
-// -------------
+string decimal = "54.75";
+string result = dec_to_oct(decimal);
+printf("%s\n", result);
 
-char* dec_to_bin(char* decimal) {
-   // checks out given decimal is in right base system.
-   if (is_proper(decimal, 'd') == 0) return "inconsistent decimal";
-   // converts given decimal to binary.
-   int max_pow = MAX_POW_BIN;
-   int min_pow = - (MAX_POW_BIN + 1);
-   float number = str_to_num(decimal);
-   char binary[MAX_LEN];
-   int index = 0;
+66.6
+*/
+string dec_to_oct(string __decimal) {
+   // Convert '__decimal' to floating-point number.
+   double decimal = atof(__decimal);
+   // Use the heap section of RAM for creating binary.
+   string octal = malloc(sizeof(char) * MAX_LEN);
+   // Declare the some variables and constants.
+   int max_pow = MAX_POW, min_pow = MIN_POW;
+   int index = 0, biggest;
 
-   while (true) {
-      // decreases number until correct value comes.
-      if (get_pow(2, max_pow) > number) binary[index] = '0';
+   while (True) {
+      // Find the digits corresponding to decimal.
+      if (pow(8, max_pow) > decimal) octal[index] = '0';
       else {
-         binary[index] = '1';
-         number = number - get_pow(2, max_pow); 
+         // Find the biggest number in 'decimal'.
+         biggest = (int) (decimal / pow(8, max_pow));
+         // Append the biggest char into 'octal'.
+         octal[index] = _num_to_char_(biggest);
+         // Decrease decimal in each iteration.
+         decimal -= (pow(8, max_pow) * biggest);
       }
-      // updates these variables and then breaks up the loop.
-      max_pow --; index ++; if (max_pow < 0) break;
+      // Update the control variables.
+      max_pow --; index ++; 
+      // Break up the while-loop.
+      if (max_pow < 0) break;
    }
-   // if given decimal has fraction, repeats same loop.
-   if (number != 0.0) {
-      // adds up '.' char and updates variable.
-      binary[index] = '.'; index ++;
-   
-      while (true) {
-         // decreases number until correct value comes.
-         if (get_pow(2, max_pow) <= number) {
-            binary[index] = '1';
-            number = number - get_pow(2, max_pow);
-         } else binary[index] = '0';
-         // updates these variables and breaks up the loop.
-         index ++; max_pow --; if (max_pow == min_pow) break;
-      }
-   }
-   char* bin = clamper(binary); return bin;
+   // Sometimes, '__decimal' has fractions. For that:
+   if (decimal != 0.0) {
+      // Append the point to 'binary'.
+      octal[index] = '.', index ++;
+
+      while (True) {
+         // Find the digits corresponding to octal.
+         if (pow(8, max_pow) <= decimal) {
+            // Find the biggest number in 'decimal'.
+            biggest = (int) (decimal / pow(8, max_pow));
+            // Append the biggest char into 'octal'.
+            octal[index] = _num_to_char_(biggest);
+            // Decrease decimal in each iteration.
+            decimal -= (pow(8, max_pow) * biggest);
+         }
+         else octal[index] = '0';
+         // Update the constrol variables again.
+         index ++, max_pow --;
+         // Break up the while-loop.
+         if (max_pow == min_pow) break;
+   }} 
+   return _cut_needless_digits_(octal);
 }
 
-char* dec_to_oct(char* decimal) {
-   // checks out given decimal is in right base system.
-   if (is_proper(decimal, 'd') == 0) return "inconsistent decimal";
-   // converts given decimal to octal.
-   int max_pow = MAX_POW_OCT;
-   int min_pow = - (MAX_POW_OCT + 1);
-   float number = str_to_num(decimal);
-   char octal[MAX_LEN];
-   int index = 0;
+/* Convert '__decimal' to hexadecimal number. For example: 
 
-   while (true) {
-      // decreases number until correct value comes.
-      if (get_pow(8, max_pow) > number) octal[index] = '0';
+string decimal = "218.625";
+string result = dec_to_hex(decimal);
+printf("%s\n", result);
+
+DA.A
+*/ 
+string dec_to_hex(string __decimal) {
+   // Convert '__decimal' to floating-point number.
+   double decimal = atof(__decimal);
+   // Use the heap section of RAM for creating binary.
+   string hex = malloc(sizeof(char) * MAX_LEN);
+   // Declare the some variables and constants.
+   int max_pow = MAX_POW, min_pow = MIN_POW;
+   int index = 0, biggest;
+
+   while (True) {
+      // Find the digits corresponding to decimal.
+      if (pow(16, max_pow) > decimal) hex[index] = '0';
       else {
-         // finds biggest number in given 'number'.
-         int biggest = (int) (number / get_pow(8, max_pow));
-         char big_char = num_to_char(biggest);
-         // adds up it onto 'octal' string.
-         octal[index] = big_char;
-         number = number - (get_pow(8, max_pow) * biggest); 
+         // Find the biggest number in 'decimal'.
+         biggest = (int) (decimal / pow(16, max_pow));
+         // Append the biggest char into 'hex'.
+         hex[index] = _hex_chars_(decimal, max_pow);
+         // Decrease decimal in each iteration.
+         decimal -= (pow(16, max_pow) * biggest);
       }
-      // updates variables and then breaks up the loop
-      max_pow --; index ++; if (max_pow < 0) break;
+      // Update the control variables.
+      max_pow --; index ++; 
+      // Break up the while-loop.
+      if (max_pow < 0) break;
    }
-   // if given decimal has fraction, repeats same loop.
-   if (number != 0.0) {
-      // adds up '.' char and updates variables.
-      octal[index] = '.'; index ++;
+   // Sometimes, '__decimal' has fractions. For that:
+   if (decimal != 0.0) {
+      // Append the point to 'binary'.
+      hex[index] = '.', index ++;
 
-      while (true) {
-         // decreases number until correct value comes.
-         if (get_pow(8, max_pow) <= number) {
-            // finds biggest number in given 'number'.
-            int biggest2 = (int) (number / get_pow(8, max_pow));
-            char big_char2 = num_to_char(biggest2);
-            // adds up it onto 'octal' string.
-            octal[index] = big_char2;
-            number = number - (get_pow(8, max_pow) * biggest2);
-         } else octal[index] = '0';
-         // updates these variables and then breaks up the loop.
-         index ++; max_pow --; if (max_pow == min_pow) break;
-      }
-   }
-   char* oct = clamper(octal); return oct;
+      while (True) {
+         // Find the digits corresponding to octal.
+         if (pow(16, max_pow) <= decimal) {
+            // Find the biggest number in 'decimal'.
+            biggest = (int) (decimal / pow(16, max_pow));
+            // Append the biggest char into 'octal'.
+            hex[index] = _hex_chars_(decimal, max_pow);
+            // Decrease decimal in each iteration.
+            decimal -= (pow(16, max_pow) * biggest);
+         }
+         else hex[index] = '0';
+         // Update the constrol variables again.
+         index ++, max_pow --;
+         // Break up the while-loop.
+         if (max_pow == min_pow) break;
+   }} 
+   return _cut_needless_digits_(hex);
 }
 
-char* dec_to_hex(char* decimal) {
-   // checks out given decimal is in right base system.
-   if (is_proper(decimal, 'd') == 0) return "inconsistent decimal";
-   // converts given decimal to hexadecimal.
-   int max_pow = MAX_POW_HEX;
-   int min_pow = - (MAX_POW_HEX + 1);
-   float number = str_to_num(decimal);
-   char hex[MAX_LEN];
-   int index = 0;
+/* Convert '__binary' to decimal number. For example: 
 
-   while (true) {
-      // decreases number until correct value comes.
-      if (get_pow(16, max_pow) > number) hex[index] = '0';
-      else {
-         // finds biggest number in given 'number'.
-         int biggest = (int) (number / get_pow(16, max_pow));
-         // adds up it onto 'hex' string.
-         hex[index] = hex_chars(number, max_pow);
-         number = number - (get_pow(16, max_pow) * biggest); 
-      }
-      // updates these variables and the breaks up the loop.
-      max_pow --; index ++; if (max_pow < 0) break;
-   }
-   // if given decimal has fraction, repeats same loop.
-   if (number != 0.0) {
-      // adds up '.' char and update variable.
-      hex[index] = '.'; index ++;
-      
-      while (true) {
-         // decreases number until correct value comes.
-         if (get_pow(16, max_pow) <= number) {
-            // finds biggest number in given 'number'.
-            int biggest2 = (int) (number / get_pow(16, max_pow));
-            // adds up it onto 'hex' string.
-            hex[index] = hex_chars(number, max_pow);
-            number = number - (get_pow(16, max_pow) * biggest2);
-         } else hex[index] = '0';
-         // updates these variables and the breaks up the loop.
-         index ++; max_pow --; if (max_pow == min_pow) break;
-      }
-   }
-   char* hexadecimal = clamper(hex); return hexadecimal;
-}  
+string binary = "110110.11"; // 54.75
+string result = bin_to_dec(binary);
+printf("%s\n", result);
 
-char* bin_to_dec(char* binary) {
-   // checks out given binary is in right base system.
-   if (is_proper(binary, 'b') == 0) return "inconsistent binary";
-   // general variables.
-   char part1[MAX_LEN];
-   char part2[MAX_LEN];
-   bool is_frac = false;
-   int index = -1;
-   float decimal = 0;
-   // determines given binary has fraction or not.
-   for (int i=0; i<strlen(binary); i++) {
-      // counts index of point.
-      index ++;
-      if (binary[i] == '.') {is_frac = true; break;}
-   }
-   // if given binary has not fraction, converts directly.
-   if (is_frac == false) {
-      // loops the 'binary'.
-      int pow = strlen(binary)-1;
-      for (int i=0; i<strlen(binary); i++) {
-         decimal += (binary[i] - '0') * get_pow(2, pow); pow --;
-      }
-   }
-   // if given binary has fraction, seperates it, 
-   if (is_frac == true) {
-      // fills in 'part1' string.
-      for (int i=0; i<index; i++) part1[i] = binary[i];
-      // fills in 'part2' string.
-      for (int i=index+1; i<=strlen(binary); i++) {
-         int limit = i - (index+1); part2[limit] = binary[i];
-      }
-      // and then converts to decimal.
-      int pow = strlen(part1)-1;
-      // converts for 'part1'.
-      for (int i=0; i<strlen(part1); i++) {
-         decimal += (part1[i] - '0') * get_pow(2, pow); pow --;
-      }
-      int pow2 = -1;
-      // converts for 'part2'.
-      for (int i=0; i<strlen(part2); i++) {
-         decimal += (part2[i] - '0') * get_pow(2, pow2); pow2 --;
-      }
-   } 
-   // converts decimal number to string.
-   char* string = num_to_str(decimal); 
-   if (is_frac == true) return clamper(string);
-   else {char* str = clamper(string); remove_char(str, '.');
-   return str;
-   }
-}   
+54.750000
+*/
+string bin_to_dec(string __binary) {
+   // Declare the some variables and constants.
+   double decimal = 0;
+   int index = 0, len;
+   boolean is_frac = False;
 
-char* bin_to_oct(char* binary) {
-   // converts binary to octal. For that, writing new  method 
-   // is useless. Instead of that, can be used above methods. 
-   // In two step, it can be handled.
+   // Check if '__binary' is floating-point or not.
+   for (int i=0; i<strlen(__binary); i++)
+      if (__binary[i] == '.') { is_frac = True; break; }
+      else index ++;
+   // Declare the iteration limits.
+   len = index - 1;
+   // If '__binary' is not floating-point number:
+   for (int i=0; i<index; i++) 
+      decimal += (__binary[i]-'0') * pow(2, len), len--; 
+   // Update the iteration limits.
+   len = -1;
+   // If '__binary' is floating-point number:
+   if (is_frac == True) 
+      for (int i=index+1; i<strlen(__binary); i++)
+         decimal += (__binary[i]-'0') * pow(2, len), len--;
 
-   // 1. converts binary to decimal.
-   char* decimal = bin_to_dec(binary);
-   // 2. converts decimal to octal.
-   char* octal = dec_to_oct(decimal);
-   // lastly, returns it.
-   return octal;
-}    
+   // Convert the decimal to string format.
+   string cdecimal = malloc(sizeof(char) * MAX_LEN);
+   sprintf(cdecimal, "%f", decimal);
 
-char* bin_to_hex(char* binary) {
-   // converts binary to hexadecimal. For that, writing new 
-   // method is useless. Instead of that, can be used above 
-   // methods. In two step, it can be handled.
-
-   // 1. converts binary to decimal.
-   char* decimal = bin_to_dec(binary);
-   // 2. converts decimal to hexadecimal.
-   char* hex = dec_to_hex(decimal);
-   // lastly, returns it.
-   return hex;
-
+   return cdecimal;
 }
 
-char* oct_to_dec(char* octal) {
-   // checks out given octal is in right base system.
-   if (is_proper(octal, 'o') == 0) return "inconsistent octal";
-   // general variables.
-   char part1[MAX_LEN];
-   char part2[MAX_LEN];
-   bool is_frac = false;
-   int index = -1;
-   float decimal = 0;
-   // determines given octal has fraction or not.
-   for (int i=0; i<strlen(octal); i++) {
-      // counts index of point.
-      index ++;
-      if (octal[i] == '.') {is_frac = true; break;}
-   }
-   // if given octal has not fraction, converts directly.
-   if (is_frac == false) {
-      // loops the 'octal'.
-      int pow = strlen(octal)-1;
-      for (int i=0; i<strlen(octal); i++) {
-         decimal += (octal[i] - '0') * get_pow(8, pow); pow --;
-      }
-   }
-   // if given octal has fraction, seperates it,
-   if (is_frac == true) {
-      // fills in 'part1' string.
-      for (int i=0; i<index; i++) part1[i] = octal[i];
-      // fills in 'part2' string.
-      for (int i=index+1; i<=strlen(octal); i++) {
-         int limit = i - (index+1); part2[limit] = octal[i];
-      }
-      // and then converts to decimal.
-      int pow = strlen(part1)-1;
-      // converts for 'part1'.
-      for (int i=0; i<strlen(part1); i++) {
-         decimal += (part1[i] - '0') * get_pow(8, pow); pow --;
-      }
-      int pow2 = -1;
-      // converts for 'part2'.
-      for (int i=0; i<strlen(part2); i++) {
-         decimal += (part2[i] - '0') * get_pow(8, pow2); pow2 --;
-      }
-   }
-   // converts decimal number to string.
-   char* string = num_to_str(decimal);
-   if (is_frac == true) return clamper(string);
-   else {char* str = clamper(string); remove_char(str, '.');
-   return str;
-   }
-}   
+/* Convert '__binary' to octal number. For example: 
 
-char* oct_to_bin(char* octal) {
-   // converts octal to binary. For that, writing new 
-   // method is useless. Instead of that, can be used above 
-   // methods. In two step, it can be handled.
+string binary = "110110.11"; 
+string result = bin_to_oct(binary);
+printf("%s\n", result);
 
-   // 1. converts octal to decimal.
-   char* decimal = oct_to_dec(octal);
-   // 2. converts decimal to binary.
-   char* binary = dec_to_bin(decimal);
-   // lastly, returns it.
-   return binary;
-}  
+66.6
+*/
+string bin_to_oct(string __binary) {
+   // Instead of writing new algorithm for this method, 
+   // we can use methods that we defined above. Shortly:
+   return dec_to_oct(bin_to_dec(__binary));
+}
 
-char* oct_to_hex(char* octal) {
-   // converts octal to hexadecimal. For that, writing new 
-   // method is useless. Instead of that, can be used above 
-   // methods. In two step, it can be handled.
+/* Convert '__binary' to hexadecimal number. For example: 
 
-   // 1. converts octal to decimal.
-   char* decimal = oct_to_dec(octal);
-   // 2. converts decimal to hexadecimal.
-   char* hex = dec_to_hex(decimal);
-   // lastly, returns it.
-   return hex;
-}  
+string binary = "110110.11"; 
+string result = bin_to_hex(binary);
+printf("%s\n", result);
 
-char* hex_to_dec(char* hex) {
-   // checks out given hexadecimal is in right base system.
-   if (is_proper(hex, 'h') == 0) return "inconsistent hexadecimal";
-   // general variables.
-   char part1[MAX_LEN];
-   char part2[MAX_LEN];
-   bool is_frac = false;
-   int index = -1;
-   float decimal = 0;
-   // determines given hexadecimal has fraction or not.
-   for (int i=0; i<strlen(hex); i++) {
-      // counts index of point.
-      index ++;
-      if (hex[i] == '.') {is_frac = true; break;}
-   }
-   // if given binary has not fraction, converts directly.
-   if (is_frac == false) {
-      // loops the 'binary'.
-      int pow = strlen(hex)-1;
-      for (int i=0; i<strlen(hex); i++) {
-         decimal += hex_to_num(hex[i]) * get_pow(16, pow); pow --;
-      }
-   }
-   // if given hexadecimal has fraction, seperates it, 
-   if (is_frac == true) {
-      // fills in 'part1' string.
-      for (int i=0; i<index; i++) part1[i] = hex[i];
-      // fills in 'part2' string.
-      for (int i=index+1; i<=strlen(hex); i++) {
-         int limit = i - (index+1); part2[limit] = hex[i];
-      }
-      // and then converts to decimal.
-      int pow = strlen(part1)-1;
-      // converts for 'part1'.
-      for (int i=0; i<strlen(part1); i++) {
-         decimal += hex_to_num(part1[i]) * get_pow(16, pow); pow --;
-      }
-      int pow2 = -1;
-      // converts for 'part2'.
-      for (int i=0; i<strlen(part2); i++) {
-         decimal += hex_to_num(part2[i]) * get_pow(16, pow2); pow2 --;
-      }
-   }
-   // converts decimal number to string.
-   char* string = num_to_str(decimal);
-   if (is_frac == true) return clamper(string);
-   else {char* str = clamper(string); remove_char(str, '.'); 
-   return str;
-   }
-}     
+36.C
+*/
+string bin_to_hex(string __binary) {
+   // Instead of writing new algorithm for this method, 
+   // we can use methods that we defined above. Shortly:
+   return dec_to_hex(bin_to_dec(__binary));
+}
 
-char* hex_to_bin(char* hex) {
-   // converts hexadecimal to binary. For that, writing new 
-   // method is useless. Instead of that, can be used above 
-   // methods. In two step, it can be handled.
+/* Convert '__octal' to decimal number. For example: 
 
-   // 1. converts hexadecimal to decimal.
-   char* decimal = hex_to_dec(hex);
-   // 2. converts decimal to binary.
-   char* binary = dec_to_bin(decimal);
-   // lastly, returns it.
-   return binary;
-}    
+string octal = "332.5"; 
+string result = oct_to_dec(octal);
+printf("%s\n", result);
 
-char* hex_to_oct(char* hex) {
-   // converts hexadecimal to octal. For that, writing new 
-   // method is useless. Instead of that, can be used above 
-   // methods. In two step, it can be handled.
+218.625000
+*/
+string oct_to_dec(string __octal) {
+   // Declare the some variables and constants.
+   double decimal = 0;
+   int index = 0, len;
+   boolean is_frac = False;
 
-   // 1. converts hexadecimal to decimal.
-   char* decimal = hex_to_dec(hex);
-   // 2. converts decimal to octal.
-   char* octal = dec_to_oct(decimal);
-   // lastly, returns it.
-   return octal;
+   // Check if '__octal' is floating-point or not.
+   for (int i=0; i<strlen(__octal); i++)
+      if (__octal[i] == '.') { is_frac = True; break; }
+      else index ++;
+   // Declare the iteration limits.
+   len = index - 1;
+   // If '__octal' is not floating-point number:
+   for (int i=0; i<index; i++) 
+      decimal += (__octal[i]-'0') * pow(8, len), len--; 
+   // Update the iteration limits.
+   len = -1;
+   // If '__binary' is floating-point number:
+   if (is_frac == True) 
+      for (int i=index+1; i<strlen(__octal); i++)
+         decimal += (__octal[i]-'0') * pow(8, len), len--;
+
+   // Convert the decimal to string format.
+   string cdecimal = malloc(sizeof(char) * MAX_LEN);
+   sprintf(cdecimal, "%f", decimal);
+
+   return cdecimal;
+} 
+
+/* Convert '__octal' to binary number. For example: 
+
+string octal = "332.5"; 
+string result = oct_to_bin(octal);
+printf("%s\n", result);
+
+11011010.101
+*/
+string oct_to_bin(string __octal) {
+   // Instead of writing new algorithm for this method, 
+   // we can use methods that we defined above. Shortly:
+   return dec_to_bin(oct_to_dec(__octal));
+}
+
+/* Convert '__octal' to hexadecimal number. For example: 
+
+string octal = "332.5"; 
+string result = oct_to_hex(octal);
+printf("%s\n", result);
+
+DA.A
+*/
+string oct_to_hex(string __octal) {
+   // Instead of writing new algorithm for this method, 
+   // we can use methods that we defined above. Shortly:
+   return dec_to_hex(oct_to_dec(__octal));
+} 
+
+/* Convert '__hexadecimal' to decimal number. For example: 
+
+string hexadecimal = "36.C"; 
+string result = hex_to_dec(hexadecimal);
+printf("%s\n", result);
+
+54.750000
+*/
+string hex_to_dec(string __hexadecimal) {
+   // Declare the some variables and constants.
+   double decimal = 0;
+   int index = 0, len;
+   boolean is_frac = False;
+
+   // Check if '__hexadecimal' is floating-point or not.
+   for (int i=0; i<strlen(__hexadecimal); i++)
+      if (__hexadecimal[i] == '.') { is_frac = True; break; }
+      else index ++;
+   // Declare the iteration limits.
+   len = index - 1;
+   // If '__hexadecimal' is not floating-point number:
+   for (int i=0; i<index; i++) 
+      decimal += _hex_to_num_(__hexadecimal[i]) * pow(16, len), 
+      len--; 
+   // Update the iteration limits.
+   len = -1;
+   // If '__hexadecimal' is floating-point number:
+   if (is_frac == True) 
+      for (int i=index+1; i<strlen(__hexadecimal); i++)
+         decimal += _hex_to_num_(__hexadecimal[i]) * pow(16,len),
+         len--;
+
+   // Convert the decimal to string format.
+   string cdecimal = malloc(sizeof(char) * MAX_LEN);
+   sprintf(cdecimal, "%f", decimal);
+
+   return cdecimal;
+}
+
+/* Convert '__hexadecimal' to binary number. For example: 
+
+string hexadecimal = "36.C"; 
+string result = hex_to_bin(hexadecimal);
+printf("%s\n", result);
+
+110110.11
+*/
+string hex_to_bin(string __hexadecimal) {
+   // Instead of writing new algorithm for this method, 
+   // we can use methods that we defined above. Shortly:
+   return dec_to_bin(hex_to_dec(__hexadecimal));
+}
+
+/* Convert '__hexadecimal' to octal number. For example: 
+
+string hexadecimal = "36.C"; 
+string result = hex_to_oct(hexadecimal);
+printf("%s\n", result);
+
+66.6
+*/
+string hex_to_oct(string __hexadecimal) {
+   // Instead of writing new algorithm for this method, 
+   // we can use methods that we defined above. Shortly:
+   return dec_to_oct(hex_to_dec(__hexadecimal));
 }
